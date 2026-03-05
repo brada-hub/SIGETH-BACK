@@ -14,8 +14,12 @@ return new class extends Migration
         Schema::create('sedes', function (Blueprint $table) {
             $table->id();
             $table->string('nombre');
+            $table->string('sigla')->nullable();
+            $table->string('abreviacion')->nullable();
+            $table->string('departamento')->nullable();
             $table->string('direccion')->nullable();
             $table->string('ciudad')->nullable();
+            $table->boolean('activo')->default(true);
             $table->timestamps();
         });
     }

@@ -13,17 +13,8 @@ class InitialSsoSeeder extends Seeder
     public function run(): void
     {
         // 1. Sedes
-        $sedeLP = \App\Models\Sede::create([
-            'nombre' => 'La Paz - Central',
-            'ciudad' => 'La Paz',
-            'direccion' => 'Av. Arce #123'
-        ]);
-
-        $sedeCB = \App\Models\Sede::create([
-            'nombre' => 'Cochabamba',
-            'ciudad' => 'Cochabamba',
-            'direccion' => 'Calle Jordan #456'
-        ]);
+        $sedeLP = \App\Models\Sede::firstOrCreate(['nombre' => 'La Paz - Central']);
+        $sedeCB = \App\Models\Sede::firstOrCreate(['nombre' => 'Cochabamba']);
 
         // 2. Aplicaciones
         $sigva = \App\Models\Application::updateOrCreate(

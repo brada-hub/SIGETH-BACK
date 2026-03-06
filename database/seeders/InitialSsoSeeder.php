@@ -26,21 +26,38 @@ class InitialSsoSeeder extends Seeder
         ]);
 
         // 2. Aplicaciones
-        $sigva = \App\Models\Application::create([
-            'nombre' => 'SIGVA',
-            'url' => 'http://localhost:9000', // Donde corra SIGVA Front
-            'icono' => 'assignment_ind',
-            'color' => 'purple',
-            'descripcion' => 'Sistema de Gestión de Vacaciones y Ausencias.'
-        ]);
+        $sigva = \App\Models\Application::updateOrCreate(
+            ['key' => 'sigva'],
+            [
+                'nombre' => 'SIGVA',
+                'url' => 'https://sigva.xpertiaplus.com',
+                'icono' => 'assignment_ind',
+                'color' => 'purple',
+                'descripcion' => 'Sistema de Gestión de Vacaciones y Ausencias.'
+            ]
+        );
 
-        $sispo = \App\Models\Application::create([
-            'nombre' => 'SISPO',
-            'url' => 'http://localhost:9001', // Donde corra SISPO Front
-            'icono' => 'groups',
-            'color' => 'teal',
-            'descripcion' => 'Sistema de Gestión de Personal y Ocupacional.'
-        ]);
+        $sispo = \App\Models\Application::updateOrCreate(
+            ['key' => 'sispo'],
+            [
+                'nombre' => 'SISPO',
+                'url' => 'https://sipost.xpertiaplus.com',
+                'icono' => 'groups',
+                'color' => 'teal',
+                'descripcion' => 'Sistema de Gestión de Personal y Ocupacional.'
+            ]
+        );
+
+        $sigeth = \App\Models\Application::updateOrCreate(
+            ['key' => 'sigeth'],
+            [
+                'nombre' => 'SIGETH',
+                'url' => 'https://sigeth.xpertiaplus.com',
+                'icono' => 'shield',
+                'color' => 'deep-purple',
+                'descripcion' => 'Panel de Control Principal SSO.'
+            ]
+        );
 
         // 3. Usuario Admin de Prueba
         $admin = \App\Models\User::create([

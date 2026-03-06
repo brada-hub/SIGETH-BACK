@@ -51,18 +51,23 @@ class InitialSsoSeeder extends Seeder
         );
 
         // 3. Usuario Admin de Prueba
-        $admin = \App\Models\User::create([
-            'ci' => '1234567',
-            'nombres' => 'Admin',
-            'apellidos' => 'SSO',
-            'email' => 'admin@sso.com',
-            'password' => \Hash::make('admin123'),
-            'sede_id' => $sedeLP->id,
-            'phone' => '77712345'
-        ]);
+        $admin = \App\Models\User::firstOrCreate(
+            ['ci' => '1234567'],
+            [
+                'nombres' => 'Admin',
+                'apellido_paterno' => 'SSO',
+                'email' => 'admin@sso.com',
+                'password' => \Hash::make('admin123'),
+                'sede_id' => $sedeLP->id,
+                'activo' => true,
+                'must_change_password' => false
+            ]
+        );
 
         // 4. Asignar accesos
-        $admin->applications()->attach($sigva->id, ['role' => 'admin', 'permissions' => json_encode(['all'])]);
-        $admin->applications()->attach($sispo->id, ['role' => 'admin', 'permissions' => json_encode(['all'])]);
+        if ($admin->applications()->count() === 0) {
+            $admin->applications()->attach($sigva->id, ['role' => 'admin', 'permissions' => json_encode(['all'])]);
+            $admin->applications()->attach($sispo->id, ['role' => 'admin', 'permissions' => json_encode(['all'])]);
+        }
     }
 }

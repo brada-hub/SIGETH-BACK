@@ -12,7 +12,7 @@ class User extends Authenticatable
     use HasApiTokens, HasFactory, Notifiable;
 
     protected $fillable = [
-        'ci', 'nombres', 'apellidos', 'apellido_paterno', 'apellido_materno',
+        'ci', 'nombres', 'apellido_paterno', 'apellido_materno',
         'email', 'password', 'phone', 'avatar',
         'sede_id', 'jurisdiccion', 'rol_id',
         'activo', 'must_change_password',
@@ -54,17 +54,7 @@ class User extends Authenticatable
 
     public function getNombreCompletoAttribute(): string
     {
-        $nombre = $this->nombres;
-        if ($this->apellido_paterno) {
-            $nombre .= ' ' . $this->apellido_paterno;
-        }
-        if ($this->apellido_materno) {
-            $nombre .= ' ' . $this->apellido_materno;
-        }
-        if (!$this->apellido_paterno && $this->apellidos) {
-            $nombre .= ' ' . $this->apellidos;
-        }
-        return $nombre;
+        return trim("{$this->nombres} {$this->apellido_paterno} {$this->apellido_materno}");
     }
 
     public function getPermisosAttribute(): array

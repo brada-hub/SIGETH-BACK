@@ -5,88 +5,113 @@ namespace App\Models;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Notifications\Notifiable;
+use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use Laravel\Sanctum\HasApiTokens;
-use Illuminate\Support\Facades\DB;
 
 class User extends Authenticatable
 {
     use HasApiTokens, HasFactory, Notifiable;
 
     protected $fillable = [
-        'ci', 'nombres', 'apellido_paterno', 'apellido_materno',
-        'email', 'password', 'phone', 'avatar',
-        'sede_id', 'jurisdiccion', 'rol_id',
-        'activo', 'must_change_password',
+        'persona_id',
+        'username',
+        'password',
+        'ci',
+        'nombres',
+        'apellidos',
+        'apellido_paterno',
+        'apellido_materno',
+        'email',
+        'phone',
+        'sede_id',
+        'jurisdiccion',
+        'rol_id',
+        'activo',
+        'must_change_password',
+        'ultimo_login',
     ];
 
-    protected $hidden = ['password', 'remember_token'];
+    protected $hidden = [
+        'password',
+        'remember_token',
+    ];
 
-    protected $appends = ['nombre_completo', 'permisos', 'systems'];
+    protected $appends = ['permisos'];
 
-    protected $with = ['rol', 'sede'];
-
-    protected function casts(): array
+    public function getPermisosAttribute(): array
     {
-        return [
-            'email_verified_at' => 'datetime',
-            'password' => 'hashed',
-            'activo' => 'boolean',
-            'must_change_password' => 'boolean',
-            'jurisdiccion' => 'array',
-        ];
+        $permisos = [];
+        if ($this->relationLoaded('roles')) {
+            foreach ($this->roles as $rol) {
+                if ($rol->relationLoaded('permisos')) {
+                    foreach ($rol->permisos as $permiso) {
+                        $permisos[] = $permiso->nombre;
+                    }
+                }
+            }
+        }
+        return array_values(array_unique($permisos));
     }
 
-    public function sede()
+    protected $casts = [
+        'ultimo_login' => 'datetime',
+        'jurisdiccion' => 'array',
+        'activo' => 'boolean',
+    ];
+
+    /* Relaciones */
+
+    public function persona(): BelongsTo
+    {
+        return $this->belongsTo(Persona::class);
+    }
+
+    public function sede(): BelongsTo
     {
         return $this->belongsTo(Sede::class);
     }
 
-    public function rol()
+    /**
+     * @deprecated Usar persona() directamente
+     */
+    public function empleado(): BelongsTo
+    {
+        return $this->belongsTo(Empleado::class);
+    }
+
+    public function userRoles(): HasMany
+    {
+        return $this->hasMany(UserRol::class);
+    }
+
+    /**
+     * Roles asignados al usuario a través de la tabla intermedia.
+     */
+    public function roles(): BelongsToMany
+    {
+        return $this->belongsToMany(Rol::class, 'user_roles')
+            ->withPivot(['id', 'sistema_id', 'activo'])
+            ->withTimestamps();
+    }
+
+    /**
+     * Alias para compatibilidad con el frontend que espera un solo rol.
+     */
+    public function rol(): BelongsTo
     {
         return $this->belongsTo(Rol::class, 'rol_id');
     }
 
-    public function applications()
+    /**
+     * Sistemas (aplicaciones) a los que tiene acceso el usuario.
+     */
+    public function applications(): BelongsToMany
     {
-        return $this->belongsToMany(Application::class, 'application_user', 'user_id', 'application_id')
-                    ->withPivot('role', 'permissions')
-                    ->withTimestamps();
-    }
-
-    public function permissions()
-    {
-        return $this->belongsToMany(Permission::class, 'model_has_permissions', 'model_id', 'permission_id')
-                    ->where('model_type', self::class);
-    }
-
-    public function getNombreCompletoAttribute(): string
-    {
-        return trim("{$this->nombres} {$this->apellido_paterno} {$this->apellido_materno}");
-    }
-
-    public function getPermisosAttribute(): array
-    {
-        try {
-            // Unir todos los permisos (del rol + directos)
-            $directPerms = $this->permissions()->pluck('name');
-
-            if ($this->rol_id) {
-                $rolePerms = DB::connection($this->getConnectionName())
-                    ->table('role_has_permissions')
-                    ->join('permissions', 'permissions.id', '=', 'role_has_permissions.permission_id')
-                    ->where('role_id', $this->rol_id)
-                    ->pluck('permissions.name');
-                return $directPerms->merge($rolePerms)->unique()->values()->toArray();
-            }
-
-            return $directPerms->unique()->values()->toArray();
-        } catch (\Exception $e) {
-            return [];
-        }
-    }
-
-    public function getSystemsAttribute(): array
-    {
-        return $this->applications()->pluck('nombre')->toArray();
+        return $this->belongsToMany(Sistema::class, 'user_roles', 'user_id', 'sistema_id')
+            ->distinct()
+            ->withPivot(['activo'])
+            ->withTimestamps();
     }
 }

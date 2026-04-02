@@ -6,14 +6,18 @@ use Illuminate\Database\Eloquent\Model;
 
 class Sede extends Model
 {
-    protected $fillable = ['nombre', 'sigla', 'departamento', 'direccion', 'ciudad', 'activo'];
-
-    protected $casts = [
-        'activo' => 'boolean',
+    protected $fillable = [
+        'nombre',
+        'sigla',
+        'departamento_id',
+        'departamento',
+        'ciudad',
+        'activo',
     ];
+    protected $casts = ['activo' => 'integer'];
 
-    public function users()
+    public function departamento_rel()
     {
-        return $this->hasMany(User::class);
+        return $this->belongsTo(Departamento::class, 'departamento_id');
     }
 }

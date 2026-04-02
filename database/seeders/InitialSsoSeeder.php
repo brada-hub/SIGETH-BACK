@@ -21,7 +21,7 @@ class InitialSsoSeeder extends Seeder
             ['key' => 'sigva'],
             [
                 'nombre' => 'SIGVA',
-                'url' => 'https://sigva.xpertiaplus.com',
+                'url' => env('SIGVA_URL', 'https://sigva.xpertiaplus.com'),
                 'icono' => 'assignment_ind',
                 'color' => 'purple',
                 'descripcion' => 'Sistema de Gestión de Vacaciones y Ausencias.'
@@ -32,7 +32,7 @@ class InitialSsoSeeder extends Seeder
             ['key' => 'sispo'],
             [
                 'nombre' => 'SISPO',
-                'url' => 'https://sipost.xpertiaplus.com',
+                'url' => env('SISPO_URL', 'https://sipost.xpertiaplus.com'),
                 'icono' => 'groups',
                 'color' => 'teal',
                 'descripcion' => 'Sistema de Gestión de Personal y Ocupacional.'
@@ -43,7 +43,7 @@ class InitialSsoSeeder extends Seeder
             ['key' => 'sigeth'],
             [
                 'nombre' => 'SIGETH',
-                'url' => 'https://sigeth.xpertiaplus.com',
+                'url' => env('SIGETH_URL', 'https://sigeth.xpertiaplus.com'),
                 'icono' => 'shield',
                 'color' => 'deep-purple',
                 'descripcion' => 'Panel de Control Principal SSO.'

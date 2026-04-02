@@ -4,22 +4,18 @@ namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
 use App\Models\User;
+use App\Models\Sistema;
+use App\Models\Permiso;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Hash;
 
 class UserController extends Controller
 {
     public function index()
     {
-        $users = User::with(['sede', 'applications', 'rol'])->orderBy('nombres')->get();
-
-        // Agregar permission_ids directos a cada user
-        $users->each(function ($user) {
-            $user->direct_permission_ids = \DB::table('model_has_permissions')
-                ->where('model_id', $user->id)
-                ->where('model_type', 'App\\Models\\User')
-                ->pluck('permission_id')
-                ->toArray();
-        });
+        // Los datos ahora están mayormente en la tabla users o accesibles por persona_id
+        $users = User::with(['persona', 'sede', 'roles', 'applications'])->get();
 
         return response()->json($users);
     }
@@ -27,6 +23,7 @@ class UserController extends Controller
     public function store(Request $request)
     {
         $request->validate([
+            'username' => 'nullable|unique:users,username',
             'ci' => 'required|unique:users,ci',
             'nombres' => 'required',
             'email' => 'required|email',
@@ -34,32 +31,28 @@ class UserController extends Controller
         ]);
 
         $user = User::create([
+            'username' => $request->username ?? $request->ci,
             'ci' => $request->ci,
             'nombres' => $request->nombres,
-            'apellidos' => trim(($request->apellido_paterno ?? '') . ' ' . ($request->apellido_materno ?? '')),
             'apellido_paterno' => $request->apellido_paterno,
             'apellido_materno' => $request->apellido_materno,
+            'apellidos' => trim(($request->apellido_paterno ?? '') . ' ' . ($request->apellido_materno ?? '')),
             'email' => $request->email,
-            'password' => $request->password,
+            'password' => Hash::make($request->password),
             'phone' => $request->phone ?? '00000000',
             'sede_id' => $request->sede_id,
-            'jurisdiccion' => $request->jurisdiccion,
+            'jurisdiccion' => $request->jurisdiccion ?? [],
             'rol_id' => $request->rol_id,
             'activo' => $request->activo ?? true,
             'must_change_password' => true,
         ]);
 
-        // Asignar aplicaciones
-        if ($request->application_ids) {
-            foreach ($request->application_ids as $appId) {
-                $user->applications()->attach($appId, [
-                    'role' => 'admin',
-                    'permissions' => json_encode(['all'])
-                ]);
-            }
+        // Sincronizar aplicaciones (Sistemas a través de user_roles)
+        if ($request->has('application_ids')) {
+            $this->syncUserApplications($user, $request->application_ids, $request->rol_id);
         }
 
-        // Permisos directos del usuario
+        // Permisos directos (si se usan)
         if ($request->has('direct_permission_ids')) {
             $this->syncUserPermissions($user->id, $request->direct_permission_ids);
         }
@@ -70,11 +63,14 @@ class UserController extends Controller
     public function show($id)
     {
         $user = User::with(['sede', 'applications', 'rol'])->findOrFail($id);
-        $user->direct_permission_ids = \DB::table('model_has_permissions')
+        
+        // Obtener permisos de model_has_permissions si se usan
+        $user->direct_permission_ids = DB::table('model_has_permissions')
             ->where('model_id', $id)
-            ->where('model_type', 'App\\Models\\User')
+            ->where('model_type', User::class)
             ->pluck('permission_id')
             ->toArray();
+            
         return response()->json($user);
     }
 
@@ -83,11 +79,15 @@ class UserController extends Controller
         $user = User::findOrFail($id);
 
         $updateData = $request->only([
-            'nombres', 'apellido_paterno', 'apellido_materno',
+            'username', 'nombres', 'apellido_paterno', 'apellido_materno',
             'email', 'phone', 'sede_id', 'jurisdiccion', 'rol_id', 'activo'
         ]);
 
-        // Sincronizar 'apellidos' legacy con apellido_paterno + apellido_materno
+        if ($request->has('ci')) {
+            $updateData['ci'] = $request->ci;
+        }
+
+        // Actualizar apellidos concatenados
         if ($request->has('apellido_paterno') || $request->has('apellido_materno')) {
             $updateData['apellidos'] = trim(
                 ($request->apellido_paterno ?? $user->apellido_paterno ?? '') . ' ' .
@@ -97,20 +97,16 @@ class UserController extends Controller
 
         $user->update($updateData);
 
-        if ($request->has('password') && $request->password) {
-            $user->update(['password' => $request->password]);
+        if ($request->filled('password')) {
+            $user->update(['password' => Hash::make($request->password)]);
         }
 
-        // Actualizar aplicaciones
+        // Sincronizar aplicaciones
         if ($request->has('application_ids')) {
-            $syncData = [];
-            foreach ($request->application_ids as $appId) {
-                $syncData[$appId] = ['role' => 'admin', 'permissions' => json_encode(['all'])];
-            }
-            $user->applications()->sync($syncData);
+            $this->syncUserApplications($user, $request->application_ids, $request->rol_id);
         }
 
-        // Permisos directos del usuario
+        // Permisos directos
         if ($request->has('direct_permission_ids')) {
             $this->syncUserPermissions($user->id, $request->direct_permission_ids);
         }
@@ -122,7 +118,7 @@ class UserController extends Controller
     {
         $user = User::findOrFail($id);
         $user->update([
-            'password' => $user->ci,
+            'password' => Hash::make($user->ci),
             'must_change_password' => true,
         ]);
         return response()->json(['message' => "Contraseña restablecida al CI: {$user->ci}"]);
@@ -131,24 +127,57 @@ class UserController extends Controller
     public function destroy($id)
     {
         $user = User::findOrFail($id);
-        \DB::table('model_has_permissions')->where('model_id', $id)->where('model_type', 'App\\Models\\User')->delete();
-        $user->applications()->detach();
-        $user->tokens()->delete();
-        $user->delete();
+        
+        DB::transaction(function () use ($user) {
+            DB::table('model_has_permissions')->where('model_id', $user->id)->where('model_type', User::class)->delete();
+            DB::table('user_roles')->where('user_id', $user->id)->delete();
+            $user->tokens()->delete();
+            $user->delete();
+        });
+
         return response()->json(['message' => 'Usuario eliminado']);
+    }
+
+    private function syncUserApplications(User $user, array $appIds, $rolId)
+    {
+        // En este sistema, las apps son 'Sistemas' y el vínculo es a través de 'user_roles'
+        // Si no hay rol_id proporcionado, usamos el que ya tiene el usuario o uno por defecto
+        $finalRolId = $rolId ?? $user->rol_id;
+        
+        if (!$finalRolId) {
+            // Buscar un rol de Administrador por defecto si no tiene uno
+            $finalRolId = DB::table('roles')->where('nombre', 'Administrador')->value('id');
+        }
+
+        if ($finalRolId) {
+            $syncData = [];
+            foreach ($appIds as $appId) {
+                $syncData[$appId] = [
+                    'rol_id' => $finalRolId,
+                    'activo' => 1,
+                    'created_at' => now(),
+                    'updated_at' => now()
+                ];
+            }
+            // Sincronizar en la tabla user_roles (sistemas)
+            DB::table('user_roles')->where('user_id', $user->id)->delete();
+            foreach ($syncData as $sistemaId => $pivotData) {
+                DB::table('user_roles')->insert(array_merge(['user_id' => $user->id, 'sistema_id' => $sistemaId], $pivotData));
+            }
+        }
     }
 
     private function syncUserPermissions($userId, array $permissionIds)
     {
-        \DB::table('model_has_permissions')
+        DB::table('model_has_permissions')
             ->where('model_id', $userId)
-            ->where('model_type', 'App\\Models\\User')
+            ->where('model_type', User::class)
             ->delete();
 
         foreach ($permissionIds as $permId) {
-            \DB::table('model_has_permissions')->insert([
+            DB::table('model_has_permissions')->insert([
                 'permission_id' => $permId,
-                'model_type' => 'App\\Models\\User',
+                'model_type' => User::class,
                 'model_id' => $userId,
             ]);
         }

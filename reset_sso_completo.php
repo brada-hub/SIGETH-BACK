@@ -54,7 +54,7 @@ DB::table('applications')->truncate();
 $sigva = DB::table('applications')->insertGetId([
     'key' => 'sigva',
     'nombre' => 'SIGVA',
-    'url' => 'https://sigva.xpertiaplus.com',
+    'url' => env('SIGVA_URL', 'https://sigva.xpertiaplus.com'),
     'icono' => 'beach_access',
     'color' => 'teal',
     'descripcion' => 'Sistema de Gestión de Vacaciones y Ausencias',
@@ -67,7 +67,7 @@ echo "  ✓ App SIGVA (ID: $sigva) creada\n";
 $sispo = DB::table('applications')->insertGetId([
     'key' => 'sispo',
     'nombre' => 'SISPO',
-    'url' => 'https://postulacionesunitepc.xpertiaplus.com',
+    'url' => env('SISPO_URL', 'https://postulacionesunitepc.xpertiaplus.com'),
     'icono' => 'assignment_ind',
     'color' => 'purple',
     'descripcion' => 'Sistema de Postulaciones y Selección de Personal',
@@ -80,7 +80,7 @@ echo "  ✓ App SISPO (ID: $sispo) creada\n";
 $sigeth = DB::table('applications')->insertGetId([
     'key' => 'sigeth',
     'nombre' => 'SIGETH',
-    'url' => 'https://sigeth.xpertiaplus.com',
+    'url' => env('SIGETH_URL', 'https://sigeth.xpertiaplus.com'),
     'icono' => 'shield',
     'color' => 'indigo',
     'descripcion' => 'Sistema de Gestión de Talento Humano - Portal Central SSO',
@@ -320,6 +320,7 @@ foreach ($perms as $p) {
 echo "\nUsuarios y sus accesos:\n";
 $users = DB::table('users')->get();
 foreach ($users as $u) {
+    /** @var object|null $role */
     $role = DB::table('roles')->where('id', $u->rol_id)->first();
     $appNames = DB::table('application_user')
         ->join('applications', 'application_user.application_id', '=', 'applications.id')
@@ -329,7 +330,7 @@ foreach ($users as $u) {
         ->join('permissions', 'model_has_permissions.permission_id', '=', 'permissions.id')
         ->where('model_has_permissions.model_id', $u->id)
         ->pluck('permissions.name');
-    echo "  [{$u->id}] {$u->nombres} | Rol: " . ($role->nombre ?? 'SIN ROL') . " | Apps: " . $appNames->implode(', ') . " | Permisos directos: " . $directPerms->count() . "\n";
+    echo "  [{$u->id}] {$u->nombres} | Rol: " . ($role ? $role->nombre : 'SIN ROL') . " | Apps: " . $appNames->implode(', ') . " | Permisos directos: " . $directPerms->count() . "\n";
 }
 
 echo "\n" . str_repeat('=', 60) . "\n";

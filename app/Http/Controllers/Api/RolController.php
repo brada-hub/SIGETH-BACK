@@ -24,11 +24,11 @@ class RolController extends Controller
 
         // Asignar permisos
         if ($request->permission_ids) {
-            \DB::table('role_has_permissions')->where('role_id', $rol->id)->delete();
+            \DB::table('rol_permisos')->where('rol_id', $rol->id)->delete();
             foreach ($request->permission_ids as $permId) {
-                \DB::table('role_has_permissions')->insert([
-                    'role_id' => $rol->id,
-                    'permission_id' => $permId,
+                \DB::table('rol_permisos')->insert([
+                    'rol_id' => $rol->id,
+                    'permiso_id' => $permId,
                 ]);
             }
         }
@@ -43,11 +43,11 @@ class RolController extends Controller
 
         // Actualizar permisos
         if ($request->has('permission_ids')) {
-            \DB::table('role_has_permissions')->where('role_id', $rol->id)->delete();
+            \DB::table('rol_permisos')->where('rol_id', $rol->id)->delete();
             foreach ($request->permission_ids as $permId) {
-                \DB::table('role_has_permissions')->insert([
-                    'role_id' => $rol->id,
-                    'permission_id' => $permId,
+                \DB::table('rol_permisos')->insert([
+                    'rol_id' => $rol->id,
+                    'permiso_id' => $permId,
                 ]);
             }
         }
@@ -58,9 +58,9 @@ class RolController extends Controller
     public function show($id)
     {
         $rol = Rol::findOrFail($id);
-        $permisos = \DB::table('role_has_permissions')
-            ->where('role_id', $id)
-            ->pluck('permission_id')
+        $permisos = \DB::table('rol_permisos')
+            ->where('rol_id', $id)
+            ->pluck('permiso_id')
             ->toArray();
         $rol->permission_ids = $permisos;
         return response()->json($rol);
